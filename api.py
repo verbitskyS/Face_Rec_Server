@@ -1,47 +1,48 @@
-import socket
 import Face
 import dataBase
+from flask import Flask
+from flask import request
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
-try:
-    soc = socket.socket()
-    host = "192.168.0.101"
-    port = 13134
-    soc.bind((host, port))
-    soc.listen(500)
-    print("all is ok")
 
-    while True:
-        conn, addr = soc.accept()
-        print("Got connection from", addr)
-
-        s = ''
-        msg = conn.recv(10000)
-        lenght_of_msg = int(msg.decode().split(" &@# ")[0])
-        s += msg.decode()
-        while (len(s) < lenght_of_msg):
-            msg = conn.recv(10000)
-            s += msg.decode()
-        print(s)
+app = Flask(__name__)
+@app.route('/', methods=['POST', 'GET'])
+def index():
+    db = dataBase.dataBase()
+    if request.method == 'POST':
+        msg = request.get_data()
+        s = msg.decode()
         if "registration" in s:
             try:
-                dataBase.reg(s)
-                conn.sendall((s.split(" &@# ")[2] + 'registered!*').encode())
+                db.add_new(s)
+                return "reg"
             except Exception:
-                conn.sendall("error*".encode())
-        else:
-            idUser = 0
-            try:
-                idUser = Face.face(s.split(" &@# ")[1], dataBase.getEncodesDict())
-            except Exception:
-                conn.sendall(("error*").encode())
-            else:
-                s = dataBase.getInfoUserById(idUser)
-                print(s)
-                conn.sendall((s + '*').encode())
+                return "error"
 
-except Exception:
-    print("error on this server")
+        elif "new_face" in s:
+            db.add_new_face(id = s.split(" &@# ")[1], image = s.split(" &@# ")[2])
+            return "added"
+        else:
+            try:
+                idUser = Face.face(s.split(" &@# ")[1], db.getEncodesDict())
+                if(idUser=='no'):
+                    return "No user"
+            except Exception:
+                return "error"
+            else:
+                s = db.getInfoUserById(idUser)
+                print(s)
+                return s
+
+    if request.method == 'GET':
+        r = request.get_data()
+        print(r)
+        return "GET"
+
+if __name__ == '__main__':
+    app.run(host='localhost', port=5678, threaded=True)
+
+
 
 
 
